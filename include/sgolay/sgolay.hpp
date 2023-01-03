@@ -40,7 +40,74 @@
 #include <cstdint>
 
 
+/* Public typedefs -----------------------------------------------------------*/
 namespace sgf {
+
+/* "Strong-types" for various numerical coefficients/parameters */
+namespace detail {
+template<typename T, typename Ttag>
+class StrongValue {
+public:
+    T v;
+
+public: 
+    constexpr explicit StrongValue(T v)
+        : v(v)
+    {}
+};
+} /* namespace detail */
+
+using I = detail::StrongValue<float, struct Iparam>;
+using K = detail::StrongValue<float, struct Kparam>;
+using M = detail::StrongValue<float, struct Mparam>;
+using N = detail::StrongValue<float, struct Nparam>;
+using S = detail::StrongValue<float, struct Sparam>;
+using T = detail::StrongValue<float, struct Tparam>;
+
+/* More readable aliases for coefficient/parameter single-letter variables */
+using HalfWidth = M;
+using PolyOrder = N;
+using DerivOrder = S;
+
+/* Public functions ----------------------------------------------------------*/
+constexpr std::size_t getWindowSize(M m) {
+    return m.v * 2 + 1;
+}
+
+namespace detail {
+/* Recursive Weight generation functions using Gram polynomials */
+constexpr float gramPoly(I i, M m, K k, S s) {
+    if (k.v > 0) {
+        return (4 * k.v - 2)
+            / (k.v * (2 * m.v - k.v + 1))
+            * (i.v * gramPoly(i, m, K(k.v - 1), s) + s.v 
+                * gramPoly(i, m, K(k.v - 1), S(s.v - 1)))
+            - ((k.v - 1) * (2 * m.v + k.v))
+            / (k.v * (2 * m.v - k.v + 1)) 
+            * gramPoly(i, m, K(k.v - 2), s);
+    }
+    return (k.v == 0 && s.v == 0) ? 1 : 0;
+}
+
+constexpr float genFact(float a, float b) {
+    float gf = 1.0f;
+    for (std::int32_t j = a - b + 1; j <= a; j++) {
+        gf = gf * j;
+    }
+    return gf;
+}
+
+constexpr float weight(I i, T t, M m, N n, S s) {
+    float sum = 0;
+    for (std::int32_t k = 0; k <= n.v; k++) {
+        sum += (2 * k + 1) 
+            * (genFact(2 * m.v, k) / genFact(2 * m.v + k + 1, k + 1))
+            * gramPoly(i, m, K(k), S(0))
+            * gramPoly(I(t.v), m, K(k), s);
+    }
+    return sum;
+}
+} /* namespace detail */
 
 } /* namespace sgf */
 
